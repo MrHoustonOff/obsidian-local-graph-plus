@@ -67,7 +67,9 @@ export class LocalGraphView extends ItemView {
         const controlsEl = this.mainContainer.createDiv({ cls: 'graph-controls' });
         const settingsButton = controlsEl.createDiv({ cls: 'graph-control-button' });
         addIcon(settingsButton, 'cog');
-        settingsButton.onClickEvent(() => {
+        
+        // THE FIX FOR THE BUTTON: Use a standard DOM event listener.
+        settingsButton.addEventListener('click', () => {
             this.toggleSettingsPanel();
         });
 
@@ -108,7 +110,6 @@ export class LocalGraphView extends ItemView {
             return;
         }
 
-        // Rest of the drawing logic...
         const width = this.canvasEl.clientWidth;
         const height = this.canvasEl.clientHeight;
         if (width === 0 || height === 0) return;
@@ -139,7 +140,6 @@ export class LocalGraphView extends ItemView {
         if (this.settingsEl.classList.contains('is-open')) {
             this.settingsEl.classList.remove('is-open');
         } else {
-            // Build the panel's content right before showing it, ensuring it's up-to-date
             this.buildSettingsPanel();
             this.settingsEl.classList.add('is-open');
         }
@@ -148,49 +148,50 @@ export class LocalGraphView extends ItemView {
     private buildSettingsPanel(): void {
         this.settingsEl.empty();
         
-        // -- HEADER --
         const header = this.settingsEl.createDiv({ cls: 'settings-panel-header' });
         header.createEl('h4', { text: 'Settings' });
         const headerControls = header.createDiv({ style: 'display: flex; gap: 10px;' });
         
         const resetButton = headerControls.createDiv({ cls: 'clickable-icon' });
         addIcon(resetButton, 'refresh-cw');
-        resetButton.onClickEvent(async () => {
-            // Reset all settings to default
+        resetButton.addEventListener('click', async () => {
             Object.assign(this.plugin.settings, DEFAULT_SETTINGS);
             await this.plugin.saveSettings();
             this.drawGraph();
-            this.buildSettingsPanel(); // Rebuild panel to show new values
+            this.buildSettingsPanel();
         });
 
         const closeButton = headerControls.createDiv({ cls: 'clickable-icon' });
         addIcon(closeButton, 'x');
-        closeButton.onClickEvent(() => this.toggleSettingsPanel());
+        closeButton.addEventListener('click', () => this.toggleSettingsPanel());
 
-        // -- CONTENT --
         const content = this.settingsEl.createDiv({ cls: 'settings-panel-content' });
-        
         const redraw = async () => { await this.plugin.saveSettings(); this.drawGraph(); };
         
-        // -- Depth Settings --
-        content.createEl('h5', { text: 'Depth' });
+        content.createEl('h5', { text: 'Depth', cls: 'settings-section-header' });
         new Setting(content).setName('Outgoing').addSlider(s => s.setLimits(1, 5, 1).setValue(this.plugin.settings.defaultOutgoingDepth).setDynamicTooltip().onChange(v => { this.plugin.settings.defaultOutgoingDepth = v; redraw(); }));
         new Setting(content).setName('Incoming').addSlider(s => s.setLimits(1, 5, 1).setValue(this.plugin.settings.defaultIncomingDepth).setDynamicTooltip().onChange(v => { this.plugin.settings.defaultIncomingDepth = v; redraw(); }));
         
-        // -- Physics Settings --
-        content.createEl('h5', { text: 'Forces' });
+        content.createEl('h5', { text: 'Forces', cls: 'settings-section-header' });
         new Setting(content).setName('Node Size').addSlider(s => s.setLimits(2, 20, 1).setValue(this.plugin.settings.nodeSize).setDynamicTooltip().onChange(v => { this.plugin.settings.nodeSize = v; redraw(); }));
         new Setting(content).setName('Link Distance').addSlider(s => s.setLimits(20, 200, 10).setValue(this.plugin.settings.linkDistance).setDynamicTooltip().onChange(v => { this.plugin.settings.linkDistance = v; redraw(); }));
         new Setting(content).setName('Charge Strength').addSlider(s => s.setLimits(-500, -10, 10).setValue(this.plugin.settings.chargeStrength).setDynamicTooltip().onChange(v => { this.plugin.settings.chargeStrength = v; redraw(); }));
         
-        // -- Color Settings --
-        content.createEl('h5', { text: 'Colors' });
+        content.createEl('h5', { text: 'Colors', cls: 'settings-section-header' });
+        
         const createColorSetting = (name: string, colorValue: string, onChange: (newColor: string) => void) => {
             const row = content.createDiv({ cls: 'color-setting-row' });
             row.createEl('span', { text: name });
-            const colorInput = row.createEl('input', { type: 'color' });
+            const swatch = row.createDiv({ cls: 'color-swatch' });
+            swatch.style.backgroundColor = colorValue;
+            const colorInput = row.createEl('input', { type: 'color', cls: 'color-input-hidden' });
             colorInput.value = colorValue;
-            colorInput.onchange = () => onChange(colorInput.value);
+            swatch.addEventListener('click', () => colorInput.click());
+            colorInput.addEventListener('input', () => {
+                const newColor = colorInput.value;
+                swatch.style.backgroundColor = newColor;
+                onChange(newColor);
+            });
         };
         
         createColorSetting('Root Node', this.plugin.settings.rootColor, (v) => { this.plugin.settings.rootColor = v; redraw(); });
@@ -203,6 +204,7 @@ export class LocalGraphView extends ItemView {
     }
 
     private dragHandler() {
+        // ... (this function remains unchanged)
         const dragstarted = (event: any, d: SimNode) => { if (!event.active && this.simulation) { this.simulation.alphaTarget(0.3).restart(); } d.fx = d.x; d.fy = d.y; }
         const dragged = (event: any, d: SimNode) => { d.fx = event.x; d.fy = event.y; }
         const dragended = (event: any, d: SimNode) => { if (!event.active && this.simulation) { this.simulation.alphaTarget(0); } d.fx = null; d.fy = null; }
