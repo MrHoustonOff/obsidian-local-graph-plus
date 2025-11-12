@@ -31,16 +31,13 @@ export function buildGraphData(app: App, rootPath: string, maxOutDepth: number, 
 
     const rootFile = app.vault.getAbstractFileByPath(rootPath);
     if (!(rootFile instanceof TFile)) {
-        // If the root path is invalid or is a folder, return empty data.
         return { nodes: [], edges: [] };
     }
 
-    // 1. Add the root node
     nodesMap.set(rootPath, { id: rootPath, depth: 0, direction: 'root' });
 
-    // 2. Iteratively find outgoing links (Breadth-First Search)
+    // Find outgoing links
     const outgoingQueue: { path: string, depth: number }[] = [{ path: rootPath, depth: 0 }];
-    // Use a Set for visited nodes for fast lookups
     const visitedOutgoing = new Set<string>([rootPath]);
 
     while (outgoingQueue.length > 0) {
@@ -49,7 +46,6 @@ export function buildGraphData(app: App, rootPath: string, maxOutDepth: number, 
 
         const resolvedLinks = app.metadataCache.resolvedLinks[path] || {};
         for (const targetPath in resolvedLinks) {
-            // Avoid adding nodes that have already been discovered
             if (!nodesMap.has(targetPath)) {
                 nodesMap.set(targetPath, { id: targetPath, depth: depth + 1, direction: 'outgoing' });
                 
@@ -58,12 +54,11 @@ export function buildGraphData(app: App, rootPath: string, maxOutDepth: number, 
                     outgoingQueue.push({ path: targetPath, depth: depth + 1 });
                 }
             }
-            // Always add the edge, even if the node already exists
             edges.push({ source: path, target: targetPath });
         }
     }
 
-    // 3. Iteratively find incoming links (backlinks)
+    // Find incoming links (backlinks)
     const incomingQueue: { path: string, depth: number }[] = [{ path: rootPath, depth: 0 }];
     const visitedIncoming = new Set<string>([rootPath]);
 
@@ -71,12 +66,17 @@ export function buildGraphData(app: App, rootPath: string, maxOutDepth: number, 
         const { path, depth } = incomingQueue.shift()!;
         if (depth >= maxInDepth) continue;
 
-        // The backlinks API requires the TFile object.
         const currentFile = app.vault.getAbstractFileByPath(path);
         if (!(currentFile instanceof TFile)) continue;
         
         const backlinks = app.metadataCache.getBacklinksForFile(currentFile).data;
         for (const sourcePath in backlinks) {
+            // IMPROVEMENT: Ensure the source file actually exists before processing.
+            // This prevents errors if the cache contains stale links to deleted files.
+            if (!app.vault.getAbstractFileByPath(sourcePath)) {
+                continue;
+            }
+
             if (!nodesMap.has(sourcePath)) {
                 nodesMap.set(sourcePath, { id: sourcePath, depth: depth + 1, direction: 'incoming' });
 
