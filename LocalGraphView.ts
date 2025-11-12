@@ -127,11 +127,41 @@ export class LocalGraphView extends ItemView {
             .attr("r", this.plugin.settings.nodeSize)
             .attr("fill", d => this.getNodeColor(d));
         
-        const truncate = (str: string, len: number) => str.length > len ? str.substring(0, len) + '…' : str;
-        
-        nodeG.append("text")
-            .text(d => truncate(d.id.split('/').pop()?.replace('.md', '') ?? d.id, this.plugin.settings.maxLabelLength))
-            .attr("font-size", 10).attr("dx", 15).attr("dy", 4).style("fill", "var(--text-normal)");
+        // --- THE FIX: Text wrapping and sizing ---
+        const labels = nodeG.append("text")
+            .attr("font-size", 5) // Halved text size
+            .attr("dx", 8)      // Adjusted offset
+            .attr("dy", 3)       // Adjusted offset
+            .style("fill", "var(--text-normal)");
+
+        const wrap = (text: d3.Selection<d3.BaseType | SVGTextElement, SimNode, SVGGElement, unknown>, lineLength: number) => {
+            text.each(function(d) {
+                const textNode = d3.select(this);
+                const fullText = d.id.split('/').pop()?.replace('.md', '') ?? d.id;
+                const words = fullText.split(/\s+/).reverse();
+                let word;
+                let line: string[] = [];
+                let lineNumber = 0;
+                const dy = 1.2; // Line height
+                
+                textNode.text(null); // Clear existing text
+                
+                let tspan = textNode.append("tspan").attr("x", 0).attr("dy", dy + "em");
+                
+                while (word = words.pop()) {
+                    line.push(word);
+                    tspan.text(line.join(" "));
+                    if ((tspan.node() as SVGTextElement).getComputedTextLength() > (lineLength * 5)) { // Heuristic for width
+                        line.pop();
+                        tspan.text(line.join(" "));
+                        line = [word];
+                        tspan = textNode.append("tspan").attr("x", 0).attr("dy", dy + "em").text(word);
+                    }
+                }
+            });
+        }
+        labels.call(wrap, this.plugin.settings.maxLabelLength);
+
 
         this.simulation.on("tick", () => {
             link.attr("x1", d => (d.source as SimNode).x!).attr("y1", d => (d.source as SimNode).y!)
@@ -213,11 +243,14 @@ export class LocalGraphView extends ItemView {
         if (!this.g || !this.svg) return;
         
         const currentGroup = d3.select(event.currentTarget as Element);
-        // Show full text
-        currentGroup.select('text')
-          .text(d.id.split('/').pop()?.replace('.md', '') ?? d.id);
+        // --- THE FIX: Displaying full text ---
+        currentGroup.select('text').selectAll('tspan').remove(); // Remove wrapped lines
+        currentGroup.select('text').append('tspan').text(d.id.split('/').pop()?.replace('.md', '') ?? d.id);
         
-        // --- THE FIX: Restoring the highlight logic ---
+        currentGroup.raise();
+        
+        const currentZoom = d3.zoomTransform(this.svg.node()!).k;
+        // --- THE FIX: Restoring highlight logic ---
         const allNodeGroups = this.g.selectAll(".nodes > g");
         const allLinks = this.g.selectAll('.links > line');
 
@@ -230,7 +263,6 @@ export class LocalGraphView extends ItemView {
         allNodeGroups.transition().duration(200)
             .style('opacity', (node_d: any) => linkedNodes.has(node_d.id) ? 1.0 : 0.2);
         
-        const currentZoom = d3.zoomTransform(this.svg.node()!).k;
         const scaledRadius = currentZoom < 1 ? this.plugin.settings.nodeSize / currentZoom : this.plugin.settings.nodeSize;
         
         allNodeGroups.select('circle')
@@ -244,10 +276,10 @@ export class LocalGraphView extends ItemView {
     private handleNodeMouseOut(event: MouseEvent, d: SimNode): void {
         if (!this.g || !this.svg) return;
         
-        const truncate = (str: string, len: number) => str.length > len ? str.substring(0, len) + '…' : str;
-        d3.select(event.currentTarget as Element).select('text')
-          .text(truncate(d.id.split('/').pop()?.replace('.md', '') ?? d.id, this.plugin.settings.maxLabelLength));
-        
+        const currentGroup = d3.select(event.currentTarget as Element);
+        // --- THE FIX: Re-wrapping the text on mouseout ---
+        currentGroup.select('text').call(wrap => this.wrapText(wrap, this.plugin.settings.maxLabelLength));
+
         const currentZoom = d3.zoomTransform(this.svg.node()!).k;
         const scaledRadius = currentZoom < 1 ? this.plugin.settings.nodeSize / currentZoom : this.plugin.settings.nodeSize;
 
@@ -256,6 +288,33 @@ export class LocalGraphView extends ItemView {
         this.g.selectAll('.links > line').transition().duration(200).style('opacity', 1.0);
     }
     
+    // Helper function for text wrapping
+    private wrapText(text: d3.Selection<d3.BaseType | SVGTextElement, SimNode, SVGGElement, unknown>, lineLength: number) {
+        text.each(function(d) {
+            const textNode = d3.select(this);
+            const fullText = d.id.split('/').pop()?.replace('.md', '') ?? d.id;
+            const words = fullText.split(/\s+/).reverse();
+            let word;
+            let line: string[] = [];
+            const dy = 1.2; // Line height relative to font size
+            
+            textNode.text(null); // Clear existing text
+            
+            let tspan = textNode.append("tspan").attr("x", 0).attr("dy", "0em");
+            
+            while (word = words.pop()) {
+                line.push(word);
+                tspan.text(line.join(" "));
+                if (line.join(" ").length > lineLength && line.length > 1) {
+                    line.pop();
+                    tspan.text(line.join(" "));
+                    line = [word];
+                    tspan = textNode.append("tspan").attr("x", 0).attr("dy", dy + "em").text(word);
+                }
+            }
+        });
+    }
+
     private dragHandler() {
         return d3.drag<SVGGElement, SimNode>()
             .on("start", (event: any, d: SimNode) => {
