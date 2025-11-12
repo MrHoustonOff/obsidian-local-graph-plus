@@ -1,0 +1,17 @@
+# Dependencies
+/node_modules
+
+# Build artifacts
+main.js
+styles.css
+versions.json
+
+# Obsidian vault specific files
+.obsidian/
+
+# IDE settings
+.idea/
+.vscode/
+
+# macOS specific files
+.DS_Store
