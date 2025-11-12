@@ -1,0 +1,86 @@
+/* Main container to hold all our elements and manage positioning */
+.local-graph-pro-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden; /* Prevents scrollbars */
+}
+
+/* The canvas where the D3 graph will be drawn */
+.graph-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* Vertical bar for control icons, like in the official graph */
+.graph-controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background-color: var(--background-secondary-alt);
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--background-modifier-border);
+}
+
+.graph-control-button {
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 4px;
+    border-radius: 4px;
+}
+.graph-control-button:hover {
+    color: var(--text-normal);
+    background-color: var(--background-modifier-hover);
+}
+
+/* The settings panel itself. It's positioned outside the view to the right */
+.graph-settings-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 300px; /* Fixed width */
+    height: 100%;
+    background-color: var(--background-secondary);
+    border-left: 1px solid var(--background-modifier-border);
+    z-index: 20;
+    padding: 16px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    
+    /* Animation setup */
+    transform: translateX(100%);
+    transition: transform 0.3s ease-in-out;
+}
+
+/* This class will be toggled by JS to slide the panel into view */
+.graph-settings-panel.is-open {
+    transform: translateX(0%);
+}
+
+/* A header inside the settings panel */
+.graph-settings-panel h4 {
+    margin-top: 0;
+    margin-bottom: 20px;
+}
+
+/* Ensure settings inside the panel look good */
+.graph-settings-panel .setting-item {
+    border-top: none;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+/* A nice horizontal rule */
+.graph-settings-panel hr {
+    border: none;
+    border-top: 1px solid var(--background-modifier-border);
+    margin: 16px 0;
+}
