@@ -1,0 +1,10 @@
+{
+	"id": "local-graph-plus",
+	"name": "Local Graph Plus",
+	"version": "0.1.0",
+	"minAppVersion": "1.0.0",
+	"description": "An advanced local graph view with multi-root support, pinning, and deep customization.",
+	"author": "MrHouston",
+	"authorUrl": "https://github.com/MrHoustonOff",
+	"isDesktopOnly": false
+}
