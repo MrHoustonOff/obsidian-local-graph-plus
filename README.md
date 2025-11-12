@@ -1,3 +1,5 @@
+<img width="1122" height="887" alt="image" src="https://github.com/user-attachments/assets/2ac250b4-d22d-471b-be13-f0a37f488b9d" />
+
 An advanced, highly customizable local graph view for Obsidian that enhances your note-linking experience. Local Graph Pro replaces the standard graph with a feature-rich, interactive, and aesthetically pleasing alternative, designed for power users.
 
 ## ✨ Key Features
