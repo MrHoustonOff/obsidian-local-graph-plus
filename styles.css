@@ -30,6 +30,8 @@
     height: 100%;
 }
 
+/* --- THE FIX FOR THE BUTTON --- */
+
 /* The vertical bar for control buttons */
 .graph-controls {
     position: absolute;
@@ -38,7 +40,6 @@
     z-index: 10;
     display: flex;
     flex-direction: column;
-    gap: 0;
     background-color: var(--background-secondary-alt);
     border-radius: 6px;
     border: 1px solid var(--background-modifier-border);
@@ -48,7 +49,13 @@
 .graph-control-button {
     cursor: pointer;
     color: var(--text-muted);
-    padding: 8px;
+    
+    /* Force a perfect square shape */
+    width: 34px;
+    height: 34px;
+    box-sizing: border-box;
+
+    /* Center the icon perfectly */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -62,7 +69,7 @@
 }
 
 
-/* --- Settings Panel Overhaul --- */
+/* --- Settings Panel --- */
 
 .graph-settings-panel {
     position: absolute;
@@ -100,6 +107,7 @@
 .settings-panel-header .clickable-icon {
     cursor: pointer;
     color: var(--text-muted);
+    padding: 4px; /* Make the click area larger */
 }
 .settings-panel-header .clickable-icon:hover {
     color: var(--text-normal);
@@ -111,7 +119,6 @@
     flex-grow: 1;
 }
 
-/* Section headers like "Depth", "Forces" */
 .settings-section-header {
     font-size: var(--font-ui-small);
     font-weight: bold;
@@ -125,7 +132,6 @@
     margin-top: 0;
 }
 
-/* Custom Color Picker Styling */
 .color-setting-row {
     display: flex;
     justify-content: space-between;
@@ -133,7 +139,6 @@
     padding: 6px 0;
 }
 
-/* The visible color circle */
 .color-swatch {
     width: 20px;
     height: 20px;
@@ -142,7 +147,6 @@
     cursor: pointer;
 }
 
-/* The actual input element, hidden from view */
 .color-input-hidden {
     display: none;
 }
