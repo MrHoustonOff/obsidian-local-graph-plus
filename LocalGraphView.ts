@@ -104,15 +104,7 @@ export class LocalGraphView extends ItemView {
                 const k = transform.k;
                 const scaledRadius = k < 1 ? this.plugin.settings.nodeSize / k : this.plugin.settings.nodeSize;
                 this.g?.selectAll('circle').attr('r', scaledRadius);
-                
-                // THE FIX for text scaling
-                const scaledFontSize = 10 / k;
-                const scaledDx = 15 / k;
-                const labels = this.g?.selectAll('text');
-                labels?.attr('font-size', scaledFontSize);
-                labels?.attr('dx', scaledDx);
-
-                labels?.style('display', k < this.plugin.settings.labelFadeThreshold ? 'none' : 'block');
+                this.g?.selectAll('text').style('display', k < this.plugin.settings.labelFadeThreshold ? 'none' : 'block');
             });
         
         this.svg.call(this.zoom);
@@ -122,10 +114,10 @@ export class LocalGraphView extends ItemView {
             .force("charge", d3.forceManyBody().strength(this.plugin.settings.chargeStrength))
             .force("center", d3.forceCenter(width / 2, height / 2));
 
-        const link = this.g.append("g").selectAll("line").data(edges).join("line")
+        const link = this.g.append("g").attr('class', 'links').selectAll("line").data(edges).join("line")
             .attr("stroke", "rgba(160, 160, 160, 0.6)").attr("stroke-width", 1.5);
         
-        const nodeG = this.g.append("g").selectAll("g").data(nodes).join("g")
+        const nodeG = this.g.append("g").attr('class', 'nodes').selectAll("g").data(nodes).join("g")
             .call(this.dragHandler())
             .on('click', (event, d) => this.handleNodeClick(event, d))
             .on('mouseover', (event, d) => this.handleNodeMouseOver(event, d))
@@ -191,7 +183,6 @@ export class LocalGraphView extends ItemView {
             row.createEl('span', { text: name });
             const swatch = row.createDiv({ cls: 'color-swatch' });
             swatch.style.backgroundColor = colorValue;
-            // THE FIX for color picker position
             const colorInput = row.createEl('input', { type: 'color', cls: 'color-input-handler' });
             colorInput.value = colorValue;
             colorInput.addEventListener('input', () => {
@@ -222,13 +213,13 @@ export class LocalGraphView extends ItemView {
         if (!this.g || !this.svg) return;
         
         const currentGroup = d3.select(event.currentTarget as Element);
-        currentGroup.select('text').text(d.id.split('/').pop()?.replace('.md', '') ?? d.id);
-        currentGroup.raise();
+        // Show full text
+        currentGroup.select('text')
+          .text(d.id.split('/').pop()?.replace('.md', '') ?? d.id);
         
-        const currentZoom = d3.zoomTransform(this.svg.node()!).k;
-        // THE FIX for mouseover effects
-        const allNodeGroups = this.g.selectAll("g > g");
-        const allLinks = this.g.selectAll('line');
+        // --- THE FIX: Restoring the highlight logic ---
+        const allNodeGroups = this.g.selectAll(".nodes > g");
+        const allLinks = this.g.selectAll('.links > line');
 
         const linkedNodes = new Set<string>([d.id]);
         allLinks.each(function(edge: any) {
@@ -239,12 +230,12 @@ export class LocalGraphView extends ItemView {
         allNodeGroups.transition().duration(200)
             .style('opacity', (node_d: any) => linkedNodes.has(node_d.id) ? 1.0 : 0.2);
         
+        const currentZoom = d3.zoomTransform(this.svg.node()!).k;
+        const scaledRadius = currentZoom < 1 ? this.plugin.settings.nodeSize / currentZoom : this.plugin.settings.nodeSize;
+        
         allNodeGroups.select('circle')
             .transition().duration(200)
-            .attr('r', (node_d: any) => {
-                const scaledRadius = currentZoom < 1 ? this.plugin.settings.nodeSize / currentZoom : this.plugin.settings.nodeSize;
-                return node_d.id === d.id ? scaledRadius * 1.5 : scaledRadius;
-            });
+            .attr('r', (node_d: any) => node_d.id === d.id ? scaledRadius * 1.5 : scaledRadius);
         
         allLinks.transition().duration(200)
             .style('opacity', (link_d: any) => (link_d.source.id === d.id || link_d.target.id === d.id) ? 1.0 : 0.1);
@@ -260,9 +251,9 @@ export class LocalGraphView extends ItemView {
         const currentZoom = d3.zoomTransform(this.svg.node()!).k;
         const scaledRadius = currentZoom < 1 ? this.plugin.settings.nodeSize / currentZoom : this.plugin.settings.nodeSize;
 
-        this.g.selectAll("g > g").transition().duration(200).style('opacity', 1.0);
+        this.g.selectAll(".nodes > g").transition().duration(200).style('opacity', 1.0);
         this.g.selectAll('circle').transition().duration(200).attr('r', scaledRadius);
-        this.g.selectAll('line').transition().duration(200).style('opacity', 1.0);
+        this.g.selectAll('.links > line').transition().duration(200).style('opacity', 1.0);
     }
     
     private dragHandler() {
