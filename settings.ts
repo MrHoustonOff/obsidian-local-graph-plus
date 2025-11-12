@@ -1,7 +1,6 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import LocalGraphPlugin from './main';
 
-// Define the structure of our settings
 export interface LocalGraphSettings {
   rootColor: string;
   outgoingColors: string[];
@@ -11,11 +10,13 @@ export interface LocalGraphSettings {
   chargeStrength: number;
   defaultOutgoingDepth: number;
   defaultIncomingDepth: number;
-  // NEW: Setting for neighbor links
   showNeighborLinks: boolean;
+  // NEW: Global and default settings for new features
+  maxLabelLength: number;
+  labelFadeThreshold: number;
+  zoomOnClickStrength: number;
 }
 
-// Set the default values
 export const DEFAULT_SETTINGS: LocalGraphSettings = {
   rootColor: '#ff6600',
   outgoingColors: ['#ffaa00', '#ffd700', '#aaff00', '#00ff88', '#00ccff'],
@@ -25,11 +26,13 @@ export const DEFAULT_SETTINGS: LocalGraphSettings = {
   chargeStrength: -250,
   defaultOutgoingDepth: 2,
   defaultIncomingDepth: 1,
-  // NEW: Default value for neighbor links
   showNeighborLinks: true,
+  // NEW: Default values
+  maxLabelLength: 10,
+  labelFadeThreshold: 0.5,
+  zoomOnClickStrength: 2.5,
 };
 
-// ... (The PluginSettingTab class remains unchanged as we moved all local settings to the view)
 export class LocalGraphSettingTab extends PluginSettingTab {
 	plugin: LocalGraphPlugin;
 
@@ -41,7 +44,21 @@ export class LocalGraphSettingTab extends PluginSettingTab {
 	display(): void {
 		const {containerEl} = this;
 		containerEl.empty();
-		containerEl.createEl('h2', {text: 'Local Graph Pro Settings'});
-        // We can add global settings here in the future, like the auto-update toggle.
+		containerEl.createEl('h2', {text: 'Local Graph Pro - Global Settings'});
+
+        containerEl.createEl('p', {text: 'These are global settings that affect all local graphs. More specific visual settings can be found in the graph view itself.'});
+
+        new Setting(containerEl)
+            .setName('Max label length')
+            .setDesc('How many characters to show on a node label before truncating.')
+            .addSlider(slider =>
+                slider.setLimits(5, 50, 1)
+                      .setValue(this.plugin.settings.maxLabelLength)
+                      .setDynamicTooltip()
+                      .onChange(async (value) => {
+                          this.plugin.settings.maxLabelLength = value;
+                          await this.plugin.saveSettings();
+                      })
+            );
 	}
 }
