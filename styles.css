@@ -26,9 +26,14 @@
     left: 0;
     width: 100%;
     height: 100%;
+    cursor: grab; /* Add grab cursor for panning */
+}
+.graph-canvas:active {
+    cursor: grabbing;
 }
 
-/* --- Control Bar & Buttons (FROM SCRATCH) --- */
+
+/* --- Control Bar & Buttons --- */
 
 .graph-controls {
     position: absolute;
@@ -41,19 +46,17 @@
     border-radius: 6px;
     border: 1px solid var(--background-modifier-border);
     overflow: hidden;
+    /* THE FIX FOR THE STRETCHING CONTAINER */
+    width: fit-content;
 }
 
-/* The button container DIV */
 .graph-control-button {
-    display: flex; /* Use flexbox for perfect centering */
+    display: flex;
     align-items: center;
     justify-content: center;
-    
-    /* Enforce a perfect square shape */
     width: 34px;
     height: 34px;
-    flex-shrink: 0; /* Prevent the button from shrinking */
-
+    flex-shrink: 0;
     cursor: pointer;
     color: var(--text-muted);
 }
@@ -61,16 +64,13 @@
     color: var(--text-normal);
     background-color: var(--background-modifier-hover);
 }
-
-/* The SVG icon itself INSIDE the button */
-.graph-control-button svg {
-    /* Control the icon size directly */
+.graph-control-button svg.svg-icon-lucide {
     width: 16px;
     height: 16px;
 }
 
 
-/* --- Settings Panel (FROM SCRATCH) --- */
+/* --- Settings Panel --- */
 
 .graph-settings-panel {
     position: absolute;
@@ -100,15 +100,12 @@
     border-bottom: 1px solid var(--background-modifier-border);
     flex-shrink: 0;
 }
-.settings-panel-header h4 {
-    margin: 0;
-}
+.settings-panel-header h4 { margin: 0; }
 .settings-panel-header .header-controls-container {
     display: flex;
     align-items: center;
     gap: 4px;
 }
-/* This is for the header buttons like Reset and Close */
 .settings-panel-header .clickable-icon {
     display: flex;
     align-items: center;
@@ -123,7 +120,7 @@
     color: var(--text-normal);
     background-color: var(--background-modifier-hover);
 }
-.settings-panel-header .clickable-icon svg {
+.settings-panel-header .clickable-icon svg.svg-icon-lucide {
     width: 16px;
     height: 16px;
 }
@@ -134,16 +131,17 @@
     flex-grow: 1;
 }
 
-.settings-section-header {
+/* Make headers in settings look good */
+.settings-panel-content .setting-item.setting-item-heading {
+    border: none;
     font-size: var(--font-ui-small);
     font-weight: bold;
     color: var(--text-muted);
-    margin-top: 20px;
-    margin-bottom: 10px;
     text-transform: uppercase;
     letter-spacing: 0.1em;
+    margin-top: 12px;
 }
-.settings-section-header:first-child {
+.settings-panel-content .setting-item:first-child.setting-item-heading {
     margin-top: 0;
 }
 
@@ -153,7 +151,6 @@
     align-items: center;
     padding: 6px 0;
 }
-
 .color-swatch {
     width: 20px;
     height: 20px;
@@ -161,7 +158,4 @@
     border: 1px solid var(--background-modifier-border);
     cursor: pointer;
 }
-
-.color-input-hidden {
-    display: none;
-}
+.color-input-hidden { display: none; }
