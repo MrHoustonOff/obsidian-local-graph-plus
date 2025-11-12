@@ -2,6 +2,7 @@ import { ItemView, WorkspaceLeaf, Setting, addIcon } from 'obsidian';
 import * as d3 from 'd3';
 import LocalGraphPlugin from './main';
 import { buildGraphData, GraphData, GraphNode as DataNode } from './graphBuilder';
+import { DEFAULT_SETTINGS } from './settings';
 
 export const LOCAL_GRAPH_VIEW_TYPE = "local-graph-pro-view";
 
@@ -12,8 +13,8 @@ export class LocalGraphView extends ItemView {
     private simulation: d3.Simulation<SimNode, any> | null = null;
     private currentFilePath: string | null = null;
     
-    // Elements for our new UI structure
     private mainContainer: HTMLDivElement;
+    private headerEl: HTMLHeadElement;
     private canvasEl: HTMLDivElement;
     private settingsEl: HTMLDivElement;
 
@@ -26,7 +27,6 @@ export class LocalGraphView extends ItemView {
         return LOCAL_GRAPH_VIEW_TYPE;
     }
 
-    // THE FIX FOR THE TITLE: This remains static, as you wanted.
     getDisplayText(): string {
         return "Local Graph";
     }
@@ -46,7 +46,6 @@ export class LocalGraphView extends ItemView {
     }
 
     async onOpen(): Promise<void> {
-        // We now build the entire UI structure here once
         this.buildUI();
     }
 
@@ -61,6 +60,8 @@ export class LocalGraphView extends ItemView {
         container.empty();
 
         this.mainContainer = container.createDiv({ cls: 'local-graph-pro-container' });
+        
+        this.headerEl = this.mainContainer.createEl('h2', { cls: "graph-view-header" });
         this.canvasEl = this.mainContainer.createDiv({ cls: 'graph-canvas' });
         
         const controlsEl = this.mainContainer.createDiv({ cls: 'graph-controls' });
@@ -70,9 +71,7 @@ export class LocalGraphView extends ItemView {
             this.toggleSettingsPanel();
         });
 
-        // The settings panel is created but hidden by default via CSS
         this.settingsEl = this.mainContainer.createDiv({ cls: 'graph-settings-panel' });
-        this.buildSettingsPanel();
     }
 
     private getNodeColor(d: SimNode): string {
@@ -92,18 +91,15 @@ export class LocalGraphView extends ItemView {
     }
 
     drawGraph(): void {
-        // Now, we only draw on the canvas element
         this.canvasEl.empty();
 
         if (!this.currentFilePath) {
-            this.canvasEl.createEl("h3", { text: "No file is active." });
+            this.headerEl.setText("No file is active.");
             return;
         }
 
         const fileName = this.currentFilePath.split('/').pop()?.replace('.md', '') || 'Active File';
-        // THE FIX FOR THE INTERNAL HEADER
-        this.canvasEl.createEl("h2", { text: `Graph of ${fileName}`, cls: "graph-view-header" });
-        // Add a class to style it if needed, e.g., making it less prominent
+        this.headerEl.setText(`Graph of ${fileName}`);
 
         const graphData: GraphData = buildGraphData(this.app, this.currentFilePath, this.plugin.settings.defaultOutgoingDepth, this.plugin.settings.defaultIncomingDepth);
         
@@ -112,6 +108,7 @@ export class LocalGraphView extends ItemView {
             return;
         }
 
+        // Rest of the drawing logic...
         const width = this.canvasEl.clientWidth;
         const height = this.canvasEl.clientHeight;
         if (width === 0 || height === 0) return;
@@ -119,10 +116,7 @@ export class LocalGraphView extends ItemView {
         const nodes: SimNode[] = graphData.nodes.map(n => ({...n}));
         const edges = graphData.edges.map(e => ({...e}));
 
-        const svg = d3.select(this.canvasEl).append("svg")
-            .attr("width", "100%")
-            .attr("height", "100%");
-
+        const svg = d3.select(this.canvasEl).append("svg").attr("width", "100%").attr("height", "100%");
         const g = svg.append("g");
 
         this.simulation = d3.forceSimulation(nodes)
@@ -131,48 +125,84 @@ export class LocalGraphView extends ItemView {
             .force("center", d3.forceCenter(width / 2, height / 2));
 
         const link = g.append("g").selectAll("line").data(edges).join("line").attr("stroke", "rgba(160, 160, 160, 0.6)").attr("stroke-width", 1.5);
-        
-        const node = g.append("g").selectAll("circle").data(nodes).join("circle")
-            .attr("r", this.plugin.settings.nodeSize)
-            .attr("fill", d => this.getNodeColor(d))
-            .call(this.dragHandler());
-        
-        const labels = g.append("g").selectAll("text").data(nodes).join("text")
-            .text(d => d.id.split('/').pop()?.replace('.md', '') ?? d.id)
-            .attr("font-size", 10).attr("dx", 15).attr("dy", 4).style("fill", "var(--text-normal)");
+        const node = g.append("g").selectAll("circle").data(nodes).join("circle").attr("r", this.plugin.settings.nodeSize).attr("fill", d => this.getNodeColor(d)).call(this.dragHandler());
+        const labels = g.append("g").selectAll("text").data(nodes).join("text").text(d => d.id.split('/').pop()?.replace('.md', '') ?? d.id).attr("font-size", 10).attr("dx", 15).attr("dy", 4).style("fill", "var(--text-normal)");
 
         this.simulation.on("tick", () => {
-            link.attr("x1", d => (d.source as SimNode).x!).attr("y1", d => (d.source as SimNode).y!)
-                .attr("x2", d => (d.target as SimNode).x!).attr("y2", d => (d.target as SimNode).y!);
+            link.attr("x1", d => (d.source as SimNode).x!).attr("y1", d => (d.source as SimNode).y!).attr("x2", d => (d.target as SimNode).x!).attr("y2", d => (d.target as SimNode).y!);
             node.attr("cx", d => d.x!).attr("cy", d => d.y!);
             labels.attr("x", d => d.x!).attr("y", d => d.y!);
         });
     }
 
     private toggleSettingsPanel(): void {
-        this.settingsEl.classList.toggle('is-open');
+        if (this.settingsEl.classList.contains('is-open')) {
+            this.settingsEl.classList.remove('is-open');
+        } else {
+            // Build the panel's content right before showing it, ensuring it's up-to-date
+            this.buildSettingsPanel();
+            this.settingsEl.classList.add('is-open');
+        }
     }
 
     private buildSettingsPanel(): void {
-        this.settingsEl.empty(); // Clear previous content
+        this.settingsEl.empty();
         
-        const redraw = async () => {
+        // -- HEADER --
+        const header = this.settingsEl.createDiv({ cls: 'settings-panel-header' });
+        header.createEl('h4', { text: 'Settings' });
+        const headerControls = header.createDiv({ style: 'display: flex; gap: 10px;' });
+        
+        const resetButton = headerControls.createDiv({ cls: 'clickable-icon' });
+        addIcon(resetButton, 'refresh-cw');
+        resetButton.onClickEvent(async () => {
+            // Reset all settings to default
+            Object.assign(this.plugin.settings, DEFAULT_SETTINGS);
             await this.plugin.saveSettings();
             this.drawGraph();
+            this.buildSettingsPanel(); // Rebuild panel to show new values
+        });
+
+        const closeButton = headerControls.createDiv({ cls: 'clickable-icon' });
+        addIcon(closeButton, 'x');
+        closeButton.onClickEvent(() => this.toggleSettingsPanel());
+
+        // -- CONTENT --
+        const content = this.settingsEl.createDiv({ cls: 'settings-panel-content' });
+        
+        const redraw = async () => { await this.plugin.saveSettings(); this.drawGraph(); };
+        
+        // -- Depth Settings --
+        content.createEl('h5', { text: 'Depth' });
+        new Setting(content).setName('Outgoing').addSlider(s => s.setLimits(1, 5, 1).setValue(this.plugin.settings.defaultOutgoingDepth).setDynamicTooltip().onChange(v => { this.plugin.settings.defaultOutgoingDepth = v; redraw(); }));
+        new Setting(content).setName('Incoming').addSlider(s => s.setLimits(1, 5, 1).setValue(this.plugin.settings.defaultIncomingDepth).setDynamicTooltip().onChange(v => { this.plugin.settings.defaultIncomingDepth = v; redraw(); }));
+        
+        // -- Physics Settings --
+        content.createEl('h5', { text: 'Forces' });
+        new Setting(content).setName('Node Size').addSlider(s => s.setLimits(2, 20, 1).setValue(this.plugin.settings.nodeSize).setDynamicTooltip().onChange(v => { this.plugin.settings.nodeSize = v; redraw(); }));
+        new Setting(content).setName('Link Distance').addSlider(s => s.setLimits(20, 200, 10).setValue(this.plugin.settings.linkDistance).setDynamicTooltip().onChange(v => { this.plugin.settings.linkDistance = v; redraw(); }));
+        new Setting(content).setName('Charge Strength').addSlider(s => s.setLimits(-500, -10, 10).setValue(this.plugin.settings.chargeStrength).setDynamicTooltip().onChange(v => { this.plugin.settings.chargeStrength = v; redraw(); }));
+        
+        // -- Color Settings --
+        content.createEl('h5', { text: 'Colors' });
+        const createColorSetting = (name: string, colorValue: string, onChange: (newColor: string) => void) => {
+            const row = content.createDiv({ cls: 'color-setting-row' });
+            row.createEl('span', { text: name });
+            const colorInput = row.createEl('input', { type: 'color' });
+            colorInput.value = colorValue;
+            colorInput.onchange = () => onChange(colorInput.value);
         };
         
-        this.settingsEl.createEl('h4', { text: 'Local Graph Settings' });
-        
-        new Setting(this.settingsEl).setName('Outgoing Depth').addSlider(s => s.setLimits(1, 5, 1).setValue(this.plugin.settings.defaultOutgoingDepth).onChange(v => { this.plugin.settings.defaultOutgoingDepth = v; redraw(); }));
-        new Setting(this.settingsEl).setName('Incoming Depth').addSlider(s => s.setLimits(1, 5, 1).setValue(this.plugin.settings.defaultIncomingDepth).onChange(v => { this.plugin.settings.defaultIncomingDepth = v; redraw(); }));
-        this.settingsEl.createEl('hr');
-        new Setting(this.settingsEl).setName('Node Size').addSlider(s => s.setLimits(2, 20, 1).setValue(this.plugin.settings.nodeSize).onChange(v => { this.plugin.settings.nodeSize = v; redraw(); }));
-        new Setting(this.settingsEl).setName('Link Distance').addSlider(s => s.setLimits(20, 200, 10).setValue(this.plugin.settings.linkDistance).onChange(v => { this.plugin.settings.linkDistance = v; redraw(); }));
-        new Setting(this.settingsEl).setName('Charge Strength').addSlider(s => s.setLimits(-500, -10, 10).setValue(this.plugin.settings.chargeStrength).onChange(v => { this.plugin.settings.chargeStrength = v; redraw(); }));
+        createColorSetting('Root Node', this.plugin.settings.rootColor, (v) => { this.plugin.settings.rootColor = v; redraw(); });
+        this.plugin.settings.outgoingColors.forEach((color, index) => {
+            createColorSetting(`Outgoing Lvl ${index + 1}`, color, (v) => { this.plugin.settings.outgoingColors[index] = v; redraw(); });
+        });
+        this.plugin.settings.incomingColors.forEach((color, index) => {
+            createColorSetting(`Incoming Lvl ${index + 1}`, color, (v) => { this.plugin.settings.incomingColors[index] = v; redraw(); });
+        });
     }
 
     private dragHandler() {
-        // ... (this function remains unchanged)
         const dragstarted = (event: any, d: SimNode) => { if (!event.active && this.simulation) { this.simulation.alphaTarget(0.3).restart(); } d.fx = d.x; d.fy = d.y; }
         const dragged = (event: any, d: SimNode) => { d.fx = event.x; d.fy = event.y; }
         const dragended = (event: any, d: SimNode) => { if (!event.active && this.simulation) { this.simulation.alphaTarget(0); } d.fx = null; d.fy = null; }
