@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, Setting, addIcon } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Setting, addIcon, IconName } from 'obsidian';
 import * as d3 from 'd3';
 import LocalGraphPlugin from './main';
 import { buildGraphData, GraphData, GraphNode as DataNode } from './graphBuilder';
@@ -23,25 +23,13 @@ export class LocalGraphView extends ItemView {
         this.plugin = plugin;
     }
 
-    getViewType(): string {
-        return LOCAL_GRAPH_VIEW_TYPE;
-    }
-
-    getDisplayText(): string {
-        return "Local Graph";
-    }
-
-    getIcon(): string {
-        return "network";
-    }
+    getViewType(): string { return LOCAL_GRAPH_VIEW_TYPE; }
+    getDisplayText(): string { return "Local Graph"; }
+    getIcon(): string { return "network"; }
 
     async setState(state: any, result: any): Promise<void> {
         this.currentFilePath = state.filePath;
-        
-        requestAnimationFrame(() => {
-            this.drawGraph();
-        });
-
+        requestAnimationFrame(() => this.drawGraph());
         return super.setState(state, result);
     }
 
@@ -50,9 +38,23 @@ export class LocalGraphView extends ItemView {
     }
 
     async onClose(): Promise<void> {
-        if (this.simulation) {
-            this.simulation.stop();
-        }
+        if (this.simulation) this.simulation.stop();
+    }
+    
+    /**
+     * Creates a reliable, styled control button.
+     * @param container The parent element.
+     * @param icon The name of the icon to use.
+     * @param tooltip The tooltip text.
+     * @param onClick The function to call on click.
+     * @returns The created button element.
+     */
+    private createControlButton(container: HTMLElement, icon: IconName, tooltip: string, onClick: () => void): HTMLDivElement {
+        const button = container.createDiv({ cls: 'graph-control-button' });
+        button.setAttribute('aria-label', tooltip);
+        addIcon(button, icon);
+        button.addEventListener('click', onClick);
+        return button;
     }
 
     private buildUI(): void {
@@ -60,16 +62,11 @@ export class LocalGraphView extends ItemView {
         container.empty();
 
         this.mainContainer = container.createDiv({ cls: 'local-graph-pro-container' });
-        
         this.headerEl = this.mainContainer.createEl('h2', { cls: "graph-view-header" });
         this.canvasEl = this.mainContainer.createDiv({ cls: 'graph-canvas' });
         
         const controlsEl = this.mainContainer.createDiv({ cls: 'graph-controls' });
-        const settingsButton = controlsEl.createDiv({ cls: 'graph-control-button' });
-        addIcon(settingsButton, 'cog');
-        
-        // THE FIX FOR THE BUTTON: Use a standard DOM event listener.
-        settingsButton.addEventListener('click', () => {
+        this.createControlButton(controlsEl, 'cog', 'Open settings', () => {
             this.toggleSettingsPanel();
         });
 
@@ -81,20 +78,15 @@ export class LocalGraphView extends ItemView {
         const fallbackColor = '#888888';
 
         switch (d.direction) {
-            case 'root':
-                return settings.rootColor;
-            case 'outgoing':
-                return settings.outgoingColors[d.depth - 1] || fallbackColor;
-            case 'incoming':
-                return settings.incomingColors[d.depth - 1] || fallbackColor;
-            default:
-                return fallbackColor;
+            case 'root': return settings.rootColor;
+            case 'outgoing': return settings.outgoingColors[d.depth - 1] || fallbackColor;
+            case 'incoming': return settings.incomingColors[d.depth - 1] || fallbackColor;
+            default: return fallbackColor;
         }
     }
 
     drawGraph(): void {
         this.canvasEl.empty();
-
         if (!this.currentFilePath) {
             this.headerEl.setText("No file is active.");
             return;
@@ -102,8 +94,7 @@ export class LocalGraphView extends ItemView {
 
         const fileName = this.currentFilePath.split('/').pop()?.replace('.md', '') || 'Active File';
         this.headerEl.setText(`Graph of ${fileName}`);
-
-        const graphData: GraphData = buildGraphData(this.app, this.currentFilePath, this.plugin.settings.defaultOutgoingDepth, this.plugin.settings.defaultIncomingDepth);
+        const graphData = buildGraphData(this.app, this.currentFilePath, this.plugin.settings.defaultOutgoingDepth, this.plugin.settings.defaultIncomingDepth);
         
         if (graphData.nodes.length <= 1) {
             this.canvasEl.createEl("p", { text: "No local links for this file." });
@@ -137,11 +128,9 @@ export class LocalGraphView extends ItemView {
     }
 
     private toggleSettingsPanel(): void {
-        if (this.settingsEl.classList.contains('is-open')) {
-            this.settingsEl.classList.remove('is-open');
-        } else {
+        const isOpen = this.settingsEl.classList.toggle('is-open');
+        if (isOpen) {
             this.buildSettingsPanel();
-            this.settingsEl.classList.add('is-open');
         }
     }
 
@@ -150,20 +139,17 @@ export class LocalGraphView extends ItemView {
         
         const header = this.settingsEl.createDiv({ cls: 'settings-panel-header' });
         header.createEl('h4', { text: 'Settings' });
-        const headerControls = header.createDiv({ style: 'display: flex; gap: 10px;' });
+        const headerControls = header.createDiv({ cls: 'header-controls-container' });
         
-        const resetButton = headerControls.createDiv({ cls: 'clickable-icon' });
-        addIcon(resetButton, 'refresh-cw');
-        resetButton.addEventListener('click', async () => {
+        this.createControlButton(headerControls, 'refresh-cw', 'Reset to defaults', async () => {
             Object.assign(this.plugin.settings, DEFAULT_SETTINGS);
             await this.plugin.saveSettings();
             this.drawGraph();
             this.buildSettingsPanel();
         });
-
-        const closeButton = headerControls.createDiv({ cls: 'clickable-icon' });
-        addIcon(closeButton, 'x');
-        closeButton.addEventListener('click', () => this.toggleSettingsPanel());
+        this.createControlButton(headerControls, 'x', 'Close', () => {
+            this.settingsEl.classList.remove('is-open');
+        });
 
         const content = this.settingsEl.createDiv({ cls: 'settings-panel-content' });
         const redraw = async () => { await this.plugin.saveSettings(); this.drawGraph(); };
@@ -178,7 +164,6 @@ export class LocalGraphView extends ItemView {
         new Setting(content).setName('Charge Strength').addSlider(s => s.setLimits(-500, -10, 10).setValue(this.plugin.settings.chargeStrength).setDynamicTooltip().onChange(v => { this.plugin.settings.chargeStrength = v; redraw(); }));
         
         content.createEl('h5', { text: 'Colors', cls: 'settings-section-header' });
-        
         const createColorSetting = (name: string, colorValue: string, onChange: (newColor: string) => void) => {
             const row = content.createDiv({ cls: 'color-setting-row' });
             row.createEl('span', { text: name });
@@ -193,14 +178,9 @@ export class LocalGraphView extends ItemView {
                 onChange(newColor);
             });
         };
-        
         createColorSetting('Root Node', this.plugin.settings.rootColor, (v) => { this.plugin.settings.rootColor = v; redraw(); });
-        this.plugin.settings.outgoingColors.forEach((color, index) => {
-            createColorSetting(`Outgoing Lvl ${index + 1}`, color, (v) => { this.plugin.settings.outgoingColors[index] = v; redraw(); });
-        });
-        this.plugin.settings.incomingColors.forEach((color, index) => {
-            createColorSetting(`Incoming Lvl ${index + 1}`, color, (v) => { this.plugin.settings.incomingColors[index] = v; redraw(); });
-        });
+        this.plugin.settings.outgoingColors.forEach((color, index) => createColorSetting(`Outgoing Lvl ${index + 1}`, color, (v) => { this.plugin.settings.outgoingColors[index] = v; redraw(); }));
+        this.plugin.settings.incomingColors.forEach((color, index) => createColorSetting(`Incoming Lvl ${index + 1}`, color, (v) => { this.plugin.settings.incomingColors[index] = v; redraw(); }));
     }
 
     private dragHandler() {
