@@ -24,7 +24,6 @@ export class LocalGraphView extends ItemView {
     }
 
     getDisplayText(): string {
-        // We will make this dynamic later
         return "Local Graph";
     }
 
@@ -32,11 +31,9 @@ export class LocalGraphView extends ItemView {
         return "network";
     }
 
-    // This is the primary way for other parts of the plugin to update the view
     async setState(state: any, result: any): Promise<void> {
         this.currentFilePath = state.filePath;
         
-        // Use requestAnimationFrame to ensure the DOM is ready for drawing
         requestAnimationFrame(() => {
             this.drawGraph();
         });
@@ -44,13 +41,29 @@ export class LocalGraphView extends ItemView {
         return super.setState(state, result);
     }
 
-    async onOpen(): Promise<void> {
-        // The initial drawing will be triggered by setState from the main plugin
-    }
+    async onOpen(): Promise<void> {}
 
     async onClose(): Promise<void> {
         if (this.simulation) {
             this.simulation.stop();
+        }
+    }
+
+    // Helper function to determine node color based on settings
+    private getNodeColor(d: SimNode): string {
+        const { settings } = this.plugin;
+        const fallbackColor = '#888888'; // A neutral grey for fallback
+
+        switch (d.direction) {
+            case 'root':
+                return settings.rootColor;
+            case 'outgoing':
+                // Depth is 1-based, array is 0-based
+                return settings.outgoingColors[d.depth - 1] || fallbackColor;
+            case 'incoming':
+                return settings.incomingColors[d.depth - 1] || fallbackColor;
+            default:
+                return fallbackColor;
         }
     }
 
@@ -63,8 +76,7 @@ export class LocalGraphView extends ItemView {
             return;
         }
 
-        // We use default depths for now. We will make these configurable later.
-        const graphData: GraphData = buildGraphData(this.app, this.currentFilePath, 2, 1);
+        const graphData: GraphData = buildGraphData(this.app, this.currentFilePath, 5, 5);
         
         if (graphData.nodes.length <= 1) {
             container.createEl("h3", { text: "No local links for this file." });
@@ -101,7 +113,8 @@ export class LocalGraphView extends ItemView {
             .data(nodes)
             .join("circle")
             .attr("r", 10)
-            .attr("fill", "#ff6600")
+            // THE MAGIC HAPPENS HERE: We now use our function to set the fill color
+            .attr("fill", d => this.getNodeColor(d))
             .call(this.dragHandler());
         
         const labels = g.append("g")
@@ -130,6 +143,7 @@ export class LocalGraphView extends ItemView {
     }
 
     private dragHandler() {
+        // ... (this function remains unchanged)
         const dragstarted = (event: any, d: SimNode) => {
             if (!event.active && this.simulation) {
                 this.simulation.alphaTarget(0.3).restart();
