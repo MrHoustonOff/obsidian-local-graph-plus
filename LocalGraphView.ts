@@ -1,29 +1,22 @@
 import { ItemView, WorkspaceLeaf } from 'obsidian';
 import * as d3 from 'd3';
-import { buildGraphData } from './graphBuilder';
+import LocalGraphPlugin from './main';
+import { buildGraphData, GraphData, GraphNode as DataNode } from './graphBuilder';
 
 export const LOCAL_GRAPH_VIEW_TYPE = "local-graph-pro-view";
 
-// Define interfaces for our graph data for type safety
-interface GraphNode extends d3.SimulationNodeDatum {
-    id: string;
-}
-
-interface GraphEdge {
-    source: string;
-    target: string;
-}
-
-interface GraphData {
-    nodes: GraphNode[];
-    edges: GraphEdge[];
-}
+// D3 simulation requires nodes to have x, y, etc.
+// We extend our DataNode with D3's SimulationNodeDatum
+interface SimNode extends DataNode, d3.SimulationNodeDatum {}
 
 export class LocalGraphView extends ItemView {
-    private simulation: d3.Simulation<GraphNode, GraphEdge> | null = null;
+    plugin: LocalGraphPlugin;
+    private simulation: d3.Simulation<SimNode, any> | null = null;
+    private currentFilePath: string | null = null;
 
-    constructor(leaf: WorkspaceLeaf) {
+    constructor(leaf: WorkspaceLeaf, plugin: LocalGraphPlugin) {
         super(leaf);
+        this.plugin = plugin;
     }
 
     getViewType(): string {
@@ -31,6 +24,7 @@ export class LocalGraphView extends ItemView {
     }
 
     getDisplayText(): string {
+        // We will make this dynamic later
         return "Local Graph";
     }
 
@@ -38,53 +32,51 @@ export class LocalGraphView extends ItemView {
         return "network";
     }
 
-    async onOpen(): Promise<void> {
-        // Use requestAnimationFrame to wait for the container to be properly sized
+    // This is the primary way for other parts of the plugin to update the view
+    async setState(state: any, result: any): Promise<void> {
+        this.currentFilePath = state.filePath;
+        
+        // Use requestAnimationFrame to ensure the DOM is ready for drawing
         requestAnimationFrame(() => {
             this.drawGraph();
         });
+
+        return super.setState(state, result);
+    }
+
+    async onOpen(): Promise<void> {
+        // The initial drawing will be triggered by setState from the main plugin
     }
 
     async onClose(): Promise<void> {
-        // Stop the simulation when the view is closed to save resources
         if (this.simulation) {
             this.simulation.stop();
         }
     }
 
     private drawGraph(): void {
-        const activeFile = this.app.workspace.getActiveFile();
-        if (activeFile) {
-            console.log(`[Local Graph Pro] Building graph for: ${activeFile.path}`);
-            // We temporarily hardcode the depth for testing purposes
-            const graphData = buildGraphData(this.app, activeFile.path, 2, 1);
-            console.log("[Local Graph Pro] Collected Data:", graphData);
-        }
         const container = this.containerEl.children[1];
         container.empty();
 
-        const staticData: GraphData = {
-            nodes: [
-                { id: 'Root Note' },
-                { id: 'Outgoing Lvl 1' },
-                { id: 'Outgoing Lvl 2' },
-                { id: 'Incoming Lvl 1' },
-                { id: 'Another Outgoing' },
-            ],
-            edges: [
-                { source: 'Root Note', target: 'Outgoing Lvl 1' },
-                { source: 'Outgoing Lvl 1', target: 'Outgoing Lvl 2' },
-                { source: 'Incoming Lvl 1', target: 'Root Note' },
-                { source: 'Root Note', target: 'Another Outgoing' },
-            ]
-        };
+        if (!this.currentFilePath) {
+            container.createEl("h3", { text: "No file is active." });
+            return;
+        }
+
+        // We use default depths for now. We will make these configurable later.
+        const graphData: GraphData = buildGraphData(this.app, this.currentFilePath, 2, 1);
+        
+        if (graphData.nodes.length <= 1) {
+            container.createEl("h3", { text: "No local links for this file." });
+            return;
+        }
 
         const width = container.clientWidth;
         const height = container.clientHeight;
+        if (width === 0 || height === 0) return;
 
-        if (width === 0 || height === 0) {
-            return;
-        }
+        const nodes: SimNode[] = graphData.nodes.map(n => ({...n}));
+        const edges = graphData.edges.map(e => ({...e}));
 
         const svg = d3.select(container).append("svg")
             .attr("width", "100%")
@@ -92,34 +84,31 @@ export class LocalGraphView extends ItemView {
 
         const g = svg.append("g");
 
-        // The simulation must be initialized before we attach the drag handler
-        // so that the handler can reference it.
-        this.simulation = d3.forceSimulation(staticData.nodes)
-            .force("link", d3.forceLink<GraphNode, GraphEdge>(staticData.edges).id(d => d.id).distance(100))
+        this.simulation = d3.forceSimulation(nodes)
+            .force("link", d3.forceLink(edges).id((d: any) => d.id).distance(100))
             .force("charge", d3.forceManyBody().strength(-250))
             .force("center", d3.forceCenter(width / 2, height / 2));
 
         const link = g.append("g")
             .selectAll("line")
-            .data(staticData.edges)
+            .data(edges)
             .join("line")
             .attr("stroke", "rgba(160, 160, 160, 0.6)")
             .attr("stroke-width", 1.5);
 
         const node = g.append("g")
             .selectAll("circle")
-            .data(staticData.nodes)
+            .data(nodes)
             .join("circle")
             .attr("r", 10)
             .attr("fill", "#ff6600")
-            // CHANGE: We now call the drag handler which will correctly reference this.simulation
             .call(this.dragHandler());
-
+        
         const labels = g.append("g")
             .selectAll("text")
-            .data(staticData.nodes)
+            .data(nodes)
             .join("text")
-            .text(d => d.id)
+            .text(d => d.id.split('/').pop()?.replace('.md', '') ?? d.id)
             .attr("font-size", 10)
             .attr("dx", 15)
             .attr("dy", 4)
@@ -127,10 +116,10 @@ export class LocalGraphView extends ItemView {
 
         this.simulation.on("tick", () => {
             link
-                .attr("x1", d => (d.source as GraphNode).x!)
-                .attr("y1", d => (d.source as GraphNode).y!)
-                .attr("x2", d => (d.target as GraphNode).x!)
-                .attr("y2", d => (d.target as GraphNode).y!);
+                .attr("x1", d => (d.source as SimNode).x!)
+                .attr("y1", d => (d.source as SimNode).y!)
+                .attr("x2", d => (d.target as SimNode).x!)
+                .attr("y2", d => (d.target as SimNode).y!);
             node
                 .attr("cx", d => d.x!)
                 .attr("cy", d => d.y!);
@@ -140,11 +129,8 @@ export class LocalGraphView extends ItemView {
         });
     }
 
-    // CHANGE: The drag handler now directly references `this.simulation`
-    // and doesn't need any arguments. We use arrow functions to ensure
-    // `this` refers to the LocalGraphView class instance.
     private dragHandler() {
-        const dragstarted = (event: any, d: GraphNode) => {
+        const dragstarted = (event: any, d: SimNode) => {
             if (!event.active && this.simulation) {
                 this.simulation.alphaTarget(0.3).restart();
             }
@@ -152,12 +138,12 @@ export class LocalGraphView extends ItemView {
             d.fy = d.y;
         }
 
-        const dragged = (event: any, d: GraphNode) => {
+        const dragged = (event: any, d: SimNode) => {
             d.fx = event.x;
             d.fy = event.y;
         }
 
-        const dragended = (event: any, d: GraphNode) => {
+        const dragended = (event: any, d: SimNode) => {
             if (!event.active && this.simulation) {
                 this.simulation.alphaTarget(0);
             }
@@ -165,7 +151,7 @@ export class LocalGraphView extends ItemView {
             d.fy = null;
         }
 
-        return d3.drag<SVGCircleElement, GraphNode>()
+        return d3.drag<SVGCircleElement, SimNode>()
             .on("start", dragstarted)
             .on("drag", dragged)
             .on("end", dragended);

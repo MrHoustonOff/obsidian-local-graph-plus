@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf } from 'obsidian';
+import { Plugin, WorkspaceLeaf, TFile } from 'obsidian';
 import { LocalGraphSettings, DEFAULT_SETTINGS, LocalGraphSettingTab } from './settings';
 import { LocalGraphView, LOCAL_GRAPH_VIEW_TYPE } from './LocalGraphView';
 
@@ -10,7 +10,8 @@ export default class LocalGraphPlugin extends Plugin {
 
 		this.registerView(
 			LOCAL_GRAPH_VIEW_TYPE,
-			(leaf) => new LocalGraphView(leaf)
+			// Pass `this` plugin instance to the view
+			(leaf) => new LocalGraphView(leaf, this)
 		);
 
 		this.addRibbonIcon('network', 'Open Local Graph', () => {
@@ -25,11 +26,35 @@ export default class LocalGraphPlugin extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: 'update-local-graph-pro',
+			name: 'Update Local Graph',
+			callback: () => {
+				const file = this.app.workspace.getActiveFile();
+				if (file) {
+					this.updateGraphView(file);
+				}
+			},
+		});
+
+		// Register the event listener for file changes
+		this.registerEvent(
+			this.app.workspace.on('active-leaf-change', (leaf) => {
+				if (leaf?.view.getViewType() === 'markdown') {
+					const file = this.app.workspace.getActiveFile();
+					if (file) {
+						// Here we will later check for the auto-update setting
+						this.updateGraphView(file);
+					}
+				}
+			})
+		);
+
 		this.addSettingTab(new LocalGraphSettingTab(this.app, this));
 	}
 
 	onunload() {
-    // Clean up any resources
+		// Clean up any resources
 	}
 
 	async loadSettings() {
@@ -41,22 +66,34 @@ export default class LocalGraphPlugin extends Plugin {
 	}
 
 	async activateView() {
-		// Detach any existing leaves of our view type
 		this.app.workspace.detachLeavesOfType(LOCAL_GRAPH_VIEW_TYPE);
 	
-		// Get the right leaf, creating one if it doesn't exist
 		let leaf: WorkspaceLeaf = this.app.workspace.getRightLeaf(false);
 		if (!leaf) {
 			leaf = this.app.workspace.getLeaf('split', 'vertical');
 		}
 	
-		// Set the view state for our custom view
 		await leaf.setViewState({
 			type: LOCAL_GRAPH_VIEW_TYPE,
 			active: true,
 		});
 	
-		// Reveal the leaf to make sure it is visible
+		// After activating, immediately update it with the current file
+		const file = this.app.workspace.getActiveFile();
+		if (file) {
+			this.updateGraphView(file);
+		}
+
 		this.app.workspace.revealLeaf(leaf);
+	}
+
+	// Helper function to update any open graph views
+	private updateGraphView(file: TFile) {
+		const leaves = this.app.workspace.getLeavesOfType(LOCAL_GRAPH_VIEW_TYPE);
+		for (const leaf of leaves) {
+			if (leaf.view instanceof LocalGraphView) {
+				leaf.view.setState({ filePath: file.path }, {});
+			}
+		}
 	}
 }
