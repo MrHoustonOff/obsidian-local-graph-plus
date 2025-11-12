@@ -70,9 +70,9 @@ export function buildGraphData(app: App, rootPath: string, maxOutDepth: number, 
         if (!(currentFile instanceof TFile)) continue;
         
         const backlinks = app.metadataCache.getBacklinksForFile(currentFile).data;
-        for (const sourcePath in backlinks) {
-            // IMPROVEMENT: Ensure the source file actually exists before processing.
-            // This prevents errors if the cache contains stale links to deleted files.
+        
+        // THE FIX IS HERE: Use `for...of` with `.keys()` to correctly iterate over the Map.
+        for (const sourcePath of backlinks.keys()) {
             if (!app.vault.getAbstractFileByPath(sourcePath)) {
                 continue;
             }
