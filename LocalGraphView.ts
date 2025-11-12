@@ -1,5 +1,6 @@
 import { ItemView, WorkspaceLeaf } from 'obsidian';
 import * as d3 from 'd3';
+import { buildGraphData } from './graphBuilder';
 
 export const LOCAL_GRAPH_VIEW_TYPE = "local-graph-pro-view";
 
@@ -52,6 +53,13 @@ export class LocalGraphView extends ItemView {
     }
 
     private drawGraph(): void {
+        const activeFile = this.app.workspace.getActiveFile();
+        if (activeFile) {
+            console.log(`[Local Graph Pro] Building graph for: ${activeFile.path}`);
+            // We temporarily hardcode the depth for testing purposes
+            const graphData = buildGraphData(this.app, activeFile.path, 2, 1);
+            console.log("[Local Graph Pro] Collected Data:", graphData);
+        }
         const container = this.containerEl.children[1];
         container.empty();
 
