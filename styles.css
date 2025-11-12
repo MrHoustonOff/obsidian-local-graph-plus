@@ -1,4 +1,4 @@
-/* Main container for positioning */
+/* --- Main View Layout --- */
 .local-graph-pro-container {
     position: relative;
     width: 100%;
@@ -6,7 +6,6 @@
     overflow: hidden;
 }
 
-/* Internal header for "Graph of ..." */
 .graph-view-header {
     position: absolute;
     top: 10px;
@@ -21,7 +20,6 @@
     z-index: 5;
 }
 
-/* The canvas where D3 draws */
 .graph-canvas {
     position: absolute;
     top: 0;
@@ -30,9 +28,8 @@
     height: 100%;
 }
 
-/* --- THE FIX FOR THE BUTTON --- */
+/* --- Control Bar & Buttons (FROM SCRATCH) --- */
 
-/* The vertical bar for control buttons */
 .graph-controls {
     position: absolute;
     top: 10px;
@@ -46,30 +43,34 @@
     overflow: hidden;
 }
 
+/* The button container DIV */
 .graph-control-button {
-    cursor: pointer;
-    color: var(--text-muted);
-    
-    /* Force a perfect square shape */
-    width: 34px;
-    height: 34px;
-    box-sizing: border-box;
-
-    /* Center the icon perfectly */
-    display: flex;
+    display: flex; /* Use flexbox for perfect centering */
     align-items: center;
     justify-content: center;
+    
+    /* Enforce a perfect square shape */
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0; /* Prevent the button from shrinking */
+
+    cursor: pointer;
+    color: var(--text-muted);
 }
 .graph-control-button:hover {
     color: var(--text-normal);
     background-color: var(--background-modifier-hover);
 }
-.graph-control-button:not(:last-child) {
-    border-bottom: 1px solid var(--background-modifier-border);
+
+/* The SVG icon itself INSIDE the button */
+.graph-control-button svg {
+    /* Control the icon size directly */
+    width: 16px;
+    height: 16px;
 }
 
 
-/* --- Settings Panel --- */
+/* --- Settings Panel (FROM SCRATCH) --- */
 
 .graph-settings-panel {
     position: absolute;
@@ -80,9 +81,7 @@
     background-color: var(--background-secondary);
     border-left: 1px solid var(--background-modifier-border);
     z-index: 20;
-    padding: 0;
     box-sizing: border-box;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
     transform: translateX(100%);
@@ -97,20 +96,36 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 16px;
+    padding: 10px 10px 10px 16px;
     border-bottom: 1px solid var(--background-modifier-border);
     flex-shrink: 0;
 }
 .settings-panel-header h4 {
     margin: 0;
 }
+.settings-panel-header .header-controls-container {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+/* This is for the header buttons like Reset and Close */
 .settings-panel-header .clickable-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
     cursor: pointer;
     color: var(--text-muted);
-    padding: 4px; /* Make the click area larger */
+    border-radius: 4px;
 }
 .settings-panel-header .clickable-icon:hover {
     color: var(--text-normal);
+    background-color: var(--background-modifier-hover);
+}
+.settings-panel-header .clickable-icon svg {
+    width: 16px;
+    height: 16px;
 }
 
 .settings-panel-content {
